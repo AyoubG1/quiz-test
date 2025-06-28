@@ -17,36 +17,31 @@
       border-radius: 10px;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
-    textarea {
+    textarea, input[type="text"] {
       width: 100%;
-      height: 60px;
+      margin-top: 5px;
+      padding: 8px;
     }
     .section {
       margin-bottom: 30px;
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 8px;
     }
     button {
       padding: 10px 20px;
       margin-top: 10px;
     }
-    .correct {
-      color: green;
-    }
-    .wrong {
-      color: red;
-    }
+    .correct { color: green; }
+    .wrong { color: red; }
   </style>
 </head>
 <body>
   <div id="container">
-    <div class="section">
+    <div class="section" id="dataSection">
       <h2>1. Add Title and Definition</h2>
       <input type="text" id="title" placeholder="Enter title" />
       <textarea id="definition" placeholder="Enter definition"></textarea>
       <button onclick="addDefinition()">Add</button>
+      <button onclick="clearAllData()">Clear All</button>
+      <button onclick="exportData()">Export JSON</button>
       <ul id="dataList"></ul>
     </div>
 
@@ -63,19 +58,72 @@
   </div>
 
   <script>
-    const data = [];
+    let data = [];
     let queue = [];
     let current = null;
+
+    const GITHUB_JSON_URL = "https://raw.githubusercontent.com/AyoubG1/quiz-test/refs/heads/main/data.json";
+
+    // Load from GitHub + localStorage
+    window.onload = async () => {
+      try {
+        const res = await fetch(GITHUB_JSON_URL);
+        const githubData = await res.json();
+        const localData = JSON.parse(localStorage.getItem('quizData') || '[]');
+        const merged = mergeUniqueData(githubData, localData);
+        data = merged;
+        localStorage.setItem('quizData', JSON.stringify(data));
+        updateDataList();
+      } catch (e) {
+        alert("Failed to load from GitHub, using local data only.");
+        data = JSON.parse(localStorage.getItem('quizData') || '[]');
+        updateDataList();
+      }
+    };
+
+    function mergeUniqueData(remote, local) {
+      const map = new Map();
+      [...remote, ...local].forEach(item => map.set(item.title, item));
+      return Array.from(map.values());
+    }
+
+    function updateDataList() {
+      const list = document.getElementById('dataList');
+      list.innerHTML = '';
+      data.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `<b>${item.title}</b>: ${item.definition}`;
+        list.appendChild(li);
+      });
+    }
 
     function addDefinition() {
       const title = document.getElementById('title').value.trim();
       const definition = document.getElementById('definition').value.trim();
       if (title && definition) {
         data.push({ title, definition });
-        document.getElementById('dataList').innerHTML += `<li><b>${title}</b>: ${definition}</li>`;
+        localStorage.setItem('quizData', JSON.stringify(data));
+        updateDataList();
         document.getElementById('title').value = '';
         document.getElementById('definition').value = '';
       }
+    }
+
+    function clearAllData() {
+      if (confirm("Clear all data?")) {
+        data = [];
+        localStorage.removeItem('quizData');
+        updateDataList();
+      }
+    }
+
+    function exportData() {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "data.json";
+      a.click();
     }
 
     function shuffleArray(arr) {
@@ -89,7 +137,9 @@
       }
       queue = shuffleArray([...data]);
       document.getElementById('quizArea').style.display = 'block';
+      document.getElementById('dataSection').style.display = 'none';
       document.getElementById('feedback').textContent = '';
+      document.getElementById('answerInput').style.display = 'inline-block';
       nextItem();
     }
 
