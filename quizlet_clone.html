@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Custom Quizlet</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f2f2f2;
+    }
+    #container {
+      max-width: 800px;
+      margin: auto;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    textarea {
+      width: 100%;
+      height: 60px;
+    }
+    .section {
+      margin-bottom: 30px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+    }
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+    }
+    .correct {
+      color: green;
+    }
+    .wrong {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div class="section">
+      <h2>1. Add Title and Definition</h2>
+      <input type="text" id="title" placeholder="Enter title" />
+      <textarea id="definition" placeholder="Enter definition"></textarea>
+      <button onclick="addDefinition()">Add</button>
+      <ul id="dataList"></ul>
+    </div>
+
+    <div class="section">
+      <h2>2. Start a Round</h2>
+      <button onclick="startRound()">Start</button>
+      <div id="quizArea" style="display:none;">
+        <h3 id="currentTitle"></h3>
+        <input type="text" id="answerInput" placeholder="Type the definition here" onkeypress="handleKey(event)" />
+        <button onclick="submitAnswer()">Submit</button>
+        <p id="feedback"></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const data = [];
+    let queue = [];
+    let current = null;
+
+    function addDefinition() {
+      const title = document.getElementById('title').value.trim();
+      const definition = document.getElementById('definition').value.trim();
+      if (title && definition) {
+        data.push({ title, definition });
+        document.getElementById('dataList').innerHTML += `<li><b>${title}</b>: ${definition}</li>`;
+        document.getElementById('title').value = '';
+        document.getElementById('definition').value = '';
+      }
+    }
+
+    function shuffleArray(arr) {
+      return arr.sort(() => Math.random() - 0.5);
+    }
+
+    function startRound() {
+      if (data.length === 0) {
+        alert("Please add some data first.");
+        return;
+      }
+      queue = shuffleArray([...data]);
+      document.getElementById('quizArea').style.display = 'block';
+      document.getElementById('feedback').textContent = '';
+      nextItem();
+    }
+
+    function nextItem() {
+      if (queue.length === 0) {
+        document.getElementById('currentTitle').textContent = "🎉 You finished all definitions!";
+        document.getElementById('answerInput').style.display = 'none';
+        return;
+      }
+      current = queue.pop();
+      document.getElementById('currentTitle').textContent = current.title;
+      document.getElementById('answerInput').value = '';
+      document.getElementById('answerInput').focus();
+    }
+
+    function submitAnswer() {
+      const userInput = document.getElementById('answerInput').value.trim();
+      const feedback = document.getElementById('feedback');
+      if (userInput === current.definition) {
+        feedback.innerHTML = `<span class='correct'>Correct!</span>`;
+        nextItem();
+      } else {
+        feedback.innerHTML = `<span class='wrong'>Wrong! Correct answer:</span> ${current.definition}`;
+        nextItem();
+      }
+    }
+
+    function handleKey(event) {
+      if (event.key === 'Enter') {
+        submitAnswer();
+      }
+    }
+  </script>
+</body>
+</html>
