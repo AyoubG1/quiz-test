@@ -5,29 +5,48 @@
   <title>Memorize Master</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg-light: linear-gradient(to right, #fdfbfb, #ebedee);
+      --bg-dark: linear-gradient(to right, #1e1e2f, #2b2b40);
+      --text-light: #333;
+      --text-dark: #f2f2f2;
+      --card-bg-light: white;
+      --card-bg-dark: #2e2e3e;
+      --accent: #5e60ce;
+    }
+
     body {
       margin: 0;
       font-family: 'Inter', sans-serif;
-      background: linear-gradient(to right, #fdfbfb, #ebedee);
-      color: #333;
+      background: var(--bg-light);
+      color: var(--text-light);
+      transition: background 0.3s, color 0.3s;
+    }
+    body.dark-mode {
+      background: var(--bg-dark);
+      color: var(--text-dark);
     }
     header {
       text-align: center;
       padding: 30px 20px 10px;
-      background: #5e60ce;
+      background: var(--accent);
       color: white;
       box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     #container {
       max-width: 800px;
       margin: 30px auto;
-      background: white;
+      background: var(--card-bg-light);
       padding: 30px;
       border-radius: 16px;
       box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+      transition: background 0.3s;
+    }
+    body.dark-mode #container {
+      background: var(--card-bg-dark);
     }
     h2 {
-      color: #5e60ce;
+      color: var(--accent);
       margin-bottom: 10px;
     }
     textarea, input[type="text"] {
@@ -42,7 +61,7 @@
       margin-bottom: 30px;
     }
     button {
-      background: #5e60ce;
+      background: var(--accent);
       color: white;
       border: none;
       padding: 10px 20px;
@@ -55,21 +74,44 @@
     button:hover {
       background: #4e52b3;
     }
-    .correct { color: #2d6a4f; font-weight: bold; }
-    .wrong { color: #d00000; font-weight: bold; }
-    ul#dataList {
-      padding-left: 20px;
+    .correct { color: #2d6a4f; font-weight: bold; animation: pop 0.3s ease; }
+    .wrong { color: #d00000; font-weight: bold; animation: shake 0.3s ease; }
+    ul#dataList { padding-left: 20px; }
+    ul#dataList li { margin-bottom: 8px; }
+    #quizArea h3 { font-size: 20px; margin-bottom: 10px; }
+    #feedback { margin-top: 10px; font-size: 16px; }
+    #progressBarWrapper {
+      margin-top: 15px;
+      background: #ddd;
+      border-radius: 6px;
+      overflow: hidden;
     }
-    ul#dataList li {
-      margin-bottom: 8px;
+    #progressBar {
+      width: 0%;
+      height: 10px;
+      background: var(--accent);
+      transition: width 0.4s ease;
     }
-    #quizArea h3 {
-      font-size: 20px;
-      margin-bottom: 10px;
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-5px); }
+      75% { transform: translateX(5px); }
     }
-    #feedback {
-      margin-top: 10px;
-      font-size: 16px;
+    @keyframes pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+    #darkToggle {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: transparent;
+      border: 2px solid white;
+      border-radius: 50px;
+      color: white;
+      padding: 5px 10px;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -77,6 +119,7 @@
   <header>
     <h1>💡 Memorize Master</h1>
     <p>Fun & Focused Definition Drills</p>
+    <button id="darkToggle" onclick="toggleDarkMode()">🌙</button>
   </header>
   <div id="container">
     <div class="section" id="dataSection">
@@ -96,6 +139,7 @@
         <h3 id="currentTitle"></h3>
         <input type="text" id="answerInput" placeholder="Type the definition here" onkeypress="handleKey(event)" />
         <button onclick="submitAnswer()">Submit</button>
+        <div id="progressBarWrapper"><div id="progressBar"></div></div>
         <p id="feedback"></p>
       </div>
     </div>
@@ -105,10 +149,12 @@
     let data = [];
     let queue = [];
     let current = null;
+    let total = 0;
 
     const GITHUB_JSON_URL = "https://raw.githubusercontent.com/AyoubG1/quiz-test/refs/heads/main/data.json";
 
     window.onload = async () => {
+      if (localStorage.getItem('dark-mode') === 'true') document.body.classList.add('dark-mode');
       try {
         const res = await fetch(GITHUB_JSON_URL);
         const githubData = await res.json();
@@ -128,6 +174,16 @@
       const map = new Map();
       [...remote, ...local].forEach(item => map.set(item.title, item));
       return Array.from(map.values());
+    }
+
+    function normalizeText(text) {
+      return text.toLowerCase()
+        .replace(/[äÄ]/g, 'a')
+        .replace(/[öÖ]/g, 'o')
+        .replace(/[üÜ]/g, 'u')
+        .replace(/ß/g, 'ss')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
 
     function updateDataList() {
@@ -179,14 +235,17 @@
         return;
       }
       queue = shuffleArray([...data]);
+      total = queue.length;
       document.getElementById('quizArea').style.display = 'block';
       document.getElementById('dataSection').style.display = 'none';
       document.getElementById('feedback').textContent = '';
       document.getElementById('answerInput').style.display = 'inline-block';
+      updateProgress();
       nextItem();
     }
 
     function nextItem() {
+      updateProgress();
       if (queue.length === 0) {
         document.getElementById('currentTitle').textContent = "🎉 You finished all definitions!";
         document.getElementById('answerInput').style.display = 'none';
@@ -199,10 +258,17 @@
       document.getElementById('answerInput').focus();
     }
 
+    function updateProgress() {
+      const progress = total === 0 ? 0 : ((total - queue.length) / total) * 100;
+      document.getElementById('progressBar').style.width = `${progress}%`;
+    }
+
     function submitAnswer() {
       const userInput = document.getElementById('answerInput').value.trim();
       const feedback = document.getElementById('feedback');
-      if (userInput === current.definition) {
+      const correctAnswer = normalizeText(current.definition);
+      const userNormalized = normalizeText(userInput);
+      if (userNormalized === correctAnswer) {
         feedback.innerHTML = `<span class='correct'>Correct!</span>`;
         nextItem();
       } else {
@@ -215,6 +281,11 @@
       if (event.key === 'Enter') {
         submitAnswer();
       }
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle('dark-mode');
+      localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode'));
     }
   </script>
 </body>
